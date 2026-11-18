@@ -1,0 +1,12 @@
+# 凭证与数据
+cookie*.txt
+data/
+output/
+samples/
+smoke_data/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env

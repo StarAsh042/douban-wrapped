@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.10", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: 回归测试（内置夹具）
+        run: |
+          python tests/test_parser.py
+          python tests/test_ws.py
+      - name: 冒烟 - CLI 帮助
+        run: python -m douban_wrapped --help
+      - name: 冒烟 - 打包元数据
+        run: |
+          python -c "import douban_wrapped, douban_wrapped.export, douban_wrapped.report; print(douban_wrapped.__version__)"

@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "douban-wrapped"
+version = "0.2.0"
+description = "豆瓣观影品味画像 + AI 年度报告：程序内登录、数据导出、品味画像、离线报告页一条龙"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "douban-wrapped contributors" }]
+keywords = ["douban", "movie", "wrapped", "annual-report", "echarts"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: End Users/Desktop",
+  "License :: OSI Approved :: MIT License",
+  "Natural Language :: Chinese (Simplified)",
+  "Operating System :: Microsoft :: Windows",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+  "Topic :: Multimedia :: Video",
+]
+
+[project.urls]
+Homepage = "https://github.com/douban-wrapped/douban-wrapped"
+
+[project.scripts]
+douban-wrapped = "douban_wrapped.cli:main"
+
+[tool.setuptools]
+packages = ["douban_wrapped"]
+
+[tool.setuptools.package-data]
+douban_wrapped = ["templates/*.html", "templates/*.js"]
