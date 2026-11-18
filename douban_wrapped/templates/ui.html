@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>douban-wrapped · 控制台</title>
+<style>
+  :root {
+    --bg: #0b0e11; --surface: #14181d; --surface-2: #1b2129;
+    --ink: #e8e6df; --sub: #8a949e; --gold: #d4a94e; --gold-dim: #a3823c;
+    --green: #3fae6a; --line: rgba(255, 255, 255, 0.07);
+    --serif: "Noto Serif SC", "STZhongsong", "SimSun", serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    padding: 40px 16px 60px; line-height: 1.6;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  .kicker { color: var(--sub); font-size: 12px; letter-spacing: 5px; margin-bottom: 12px; }
+  .kicker b { color: var(--gold); font-weight: 600; }
+  h1 { font-family: var(--serif); font-size: 34px; letter-spacing: 2px; margin-bottom: 6px; }
+  h1 .reel { color: var(--gold); }
+  .sub { color: var(--sub); font-size: 13px; margin-bottom: 26px; }
+  .badge {
+    display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: 12px;
+    border: 1px solid var(--line); color: var(--sub); margin-left: 10px; vertical-align: middle;
+  }
+  .badge.on { color: var(--gold); border-color: rgba(212,169,78,0.5); }
+  .steps { display: grid; gap: 14px; }
+  .step {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    padding: 20px 24px; display: flex; align-items: center; gap: 18px;
+  }
+  .step .no {
+    font-family: var(--serif); font-size: 26px; color: var(--gold);
+    width: 40px; text-align: center; flex: none;
+  }
+  .step .txt { flex: 1; }
+  .step .txt b { font-size: 15px; }
+  .step .txt p { color: var(--sub); font-size: 12.5px; margin-top: 3px; }
+  button.act {
+    padding: 10px 20px; border-radius: 10px; font-size: 13px; letter-spacing: 1px;
+    background: transparent; border: 1px solid rgba(212,169,78,0.5); color: var(--gold);
+    transition: background 0.2s, border-color 0.2s; white-space: nowrap;
+  }
+  button.act:hover:not(:disabled) { background: rgba(212,169,78,0.14); border-color: var(--gold); }
+  button.act:disabled { opacity: 0.45; }
+  button.act.big { background: var(--gold); color: #0b0e11; font-weight: 600; border-color: var(--gold); }
+  button.act.big:hover:not(:disabled) { background: #e0b95e; }
+  button.act.stop { border-color: rgba(207,102,102,0.6); color: #e08a8a; }
+  button.act.stop:hover:not(:disabled) { background: rgba(207,102,102,0.16); border-color: #e08a8a; }
+  .files {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    padding: 14px 22px; display: flex; flex-wrap: wrap; gap: 10px 26px; margin: 18px 0;
+    font-size: 12.5px;
+  }
+  .fok { color: var(--green); } .fno { color: var(--sub); }
+  .console {
+    background: #0d1014; border: 1px solid var(--line); border-radius: 14px;
+    padding: 16px 18px; margin-top: 18px;
+  }
+  .console h2 { font-size: 13px; color: var(--sub); letter-spacing: 2px; margin-bottom: 10px; }
+  pre {
+    font-family: Consolas, "Courier New", monospace; font-size: 12px; line-height: 1.7;
+    color: #b9c0b9; max-height: 320px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+  }
+  .console .live { color: var(--gold); font-size: 11px; letter-spacing: 2px; }
+  .hint { color: var(--sub); font-size: 12px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker">DOUBAN · <b>WRAPPED</b> · 控制台</div>
+  <h1>一键生成<span class="reel">观影年报</span><span class="badge" id="state">空闲</span></h1>
+  <p class="sub">登录 → 导出 → 画像 → 报告页，全程不需要命令行</p>
+
+  <div class="files" id="files">加载中…</div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="no">①</div>
+      <div class="txt"><b>登录豆瓣</b><p>已登录则直接提取登录态；否则在当前浏览器打开豆瓣登录页，登录后自动捕获并保存</p></div>
+      <button class="act" data-act="login">登录 / 提取</button>
+    </div>
+    <div class="step">
+      <div class="no">②</div>
+      <div class="txt"><b>一键全流程</b><p>导出看过/想看 + 补元数据 + 生成画像与报告页（有缓存，重复跑很快）</p></div>
+      <button class="act big" data-act="all">一键生成</button>
+      <button class="act stop" data-act="stop" id="stop-btn" style="display:none">中止运行</button>
+    </div>
+    <div class="step">
+      <div class="no">③</div>
+      <div class="txt"><b>查看报告</b><p>打开报告页：暗色放映室 + 真钢琴配乐 + 海报墙</p></div>
+      <button class="act" id="open-btn">打开报告页</button>
+    </div>
+    <div class="step">
+      <div class="no">∞</div>
+      <div class="txt"><b>双人契合度</b><p>拿对象/朋友的 movies.csv 路径来比一比（Pearson 相关 + 默契/分歧片）</p>
+        <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap">
+          <input id="pair-path" placeholder="对方的 movies.csv 路径" style="flex:1; min-width:200px; background:var(--surface-2); border:1px solid var(--line); color:var(--ink); border-radius:8px; padding:8px 12px; font-size:12.5px">
+          <input id="pair-name" placeholder="TA 的名字" style="width:110px; background:var(--surface-2); border:1px solid var(--line); color:var(--ink); border-radius:8px; padding:8px 12px; font-size:12.5px">
+        </div>
+      </div>
+      <div>
+        <button class="act" data-act="pair" style="margin-right:8px">算契合度</button>
+        <button class="act" data-act="pair_page">生成契合度页面</button>
+      </div>
+    </div>
+    <div class="step">
+      <div class="no">⚙</div>
+      <div class="txt"><b>单独执行</b><p>只想跑其中一步时用</p></div>
+      <div>
+        <button class="act" data-act="export" style="margin-right:8px">导出数据</button>
+        <button class="act" data-act="analyze" style="margin-right:8px">品味画像</button>
+        <button class="act" data-act="report">生成报告页</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="no">▣</div>
+    <div class="txt"><b>报告页预览</b><p>在本页内嵌查看报告（生成后可点）</p></div>
+    <button class="act" id="preview-btn">加载预览</button>
+  </div>
+  <div id="preview-box" style="display:none; margin-top:14px">
+    <iframe id="preview" title="报告页预览"
+      style="width:100%; height:560px; border:1px solid var(--line); border-radius:12px; background:var(--bg)"></iframe>
+  </div>
+
+  <div class="files" id="stats">画像摘要：暂无（生成后自动显示）</div>
+
+  <div class="console">
+    <h2>运行日志 <span class="live" id="live">● LIVE</span></h2>
+    <pre id="log">等待任务…</pre>
+  </div>
+  <p class="hint">Cookie 与数据只存本机目录；关掉本页面不影响正在跑的任务，关掉启动它的窗口则服务停止。</p>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const acts = document.querySelectorAll("button.act");
+
+async function poll() {
+  try {
+    const s = await (await fetch("/api/status")).json();
+    const badge = $("state");
+    if (s.job) { badge.textContent = "任务中：" + s.job + "（" + s.started + "）"; badge.classList.add("on"); }
+    else { badge.textContent = s.ok === false ? "上次任务失败" : "空闲"; badge.classList.toggle("on", false); }
+    acts.forEach(b => {
+      if (b.dataset.act === "stop") { b.style.display = s.job ? "" : "none"; b.disabled = false; }
+      else b.disabled = !!s.job;
+    });
+    const fk = (v, name) => '<span class="' + (v ? "fok" : "fno") + '">' + name + (v ? " ✓" : " ✗") + '</span>';
+    $("files").innerHTML =
+      fk(s.files.cookie, "cookie.txt") + fk(s.files.csv, "data/movies.csv") +
+      fk(s.files.profile, "data/profile.json") + fk(s.files.report, "output/report.html");
+    const log = $("log");
+    const txt = (s.log || []).join("\n");
+    if (log.textContent !== txt) {
+      log.textContent = txt || "等待任务…";
+      log.scrollTop = log.scrollHeight;
+    }
+    $("live").style.visibility = s.job ? "visible" : "hidden";
+    if (!window.__statsDone && s.files.profile) {
+      window.__statsDone = true;
+      try {
+        const pr = await (await fetch("/api/profile")).json();
+        const o = pr.overview || {};
+        const top = (pr.major_genre_stats || [])[0];
+        const my10 = (o.avg_my == null) ? "-" : (Math.round(o.avg_my * 20) / 10).toFixed(1);
+        const db10 = (o.avg_douban == null) ? "-" : (Math.round(o.avg_douban * 10) / 10).toFixed(1);
+        $("stats").innerHTML =
+          '看过 <span class="fok">' + (o.watched || 0) + '</span> 部（电影 ' + (o.movies || 0) +
+          ' / 剧集 ' + (o.tv || 0) + '）· 评分 ' + (o.rated || 0) + ' · 我的均分 <span class="fok">' +
+          my10 + '</span> 分 vs 豆瓣 ' + db10 + ' 分（均按 10 分制）' +
+          (top ? ' · 最爱 <span class="fok">' + top.name + '</span> ×' + top.count : "");
+      } catch (e) {}
+    }
+  } catch (e) { /* 服务重启中 */ }
+}
+async function doAct(el) {
+  if (el.disabled) return;
+  el.disabled = true;
+  const payload = { action: el.dataset.act };
+  if (el.dataset.act === "pair" || el.dataset.act === "pair_page") {
+    payload.csv2 = document.getElementById("pair-path").value.trim() || "data/other_movies.csv";
+    payload.name2 = document.getElementById("pair-name").value.trim() || "TA";
+  }
+  try {
+    await fetch("/api/action", { method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload) });
+  } catch (e) {}
+  poll();
+}
+acts.forEach(b => b.addEventListener("click", () => doAct(b)));
+// ③ 报告页：必须在用户点击的同步调用栈里 window.open，新标签继承用户激活 → 浏览器允许带声音自动播放
+document.getElementById("open-btn").addEventListener("click", () => {
+  window.open("/output/report.html?autoplay=1", "_blank");
+});
+document.getElementById("preview-btn").addEventListener("click", async () => {
+  const box = document.getElementById("preview-box");
+  const frame = document.getElementById("preview");
+  const btn = document.getElementById("preview-btn");
+  const st = await (await fetch("/api/status")).json();
+  if (!st.files.report) {
+    btn.textContent = "报告页还不存在，先跑全流程";
+    setTimeout(() => { btn.textContent = "加载预览"; }, 2500);
+    return;
+  }
+  if (box.style.display === "none") {
+    frame.src = "/output/report.html?t=" + Date.now();
+    box.style.display = "";
+    document.getElementById("preview-btn").textContent = "收起预览";
+  } else {
+    box.style.display = "none";
+    frame.src = "about:blank";
+    document.getElementById("preview-btn").textContent = "加载预览";
+  }
+});
+poll();
+setInterval(poll, 1500);
+</script>
+</body>
+</html>

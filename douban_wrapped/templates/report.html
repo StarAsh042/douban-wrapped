@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的豆瓣观影年报</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%230b0e11' stroke='%23d4a94e' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='6' fill='none' stroke='%23d4a94e' stroke-width='1.4' opacity='.6'/%3E%3Ccircle cx='16' cy='16' r='2.6' fill='%23d4a94e'/%3E%3C/svg%3E">
+<!--ECHARTS_SCRIPT-->
+<style>
+  :root {
+    --bg: #0b0e11;
+    --surface: #14181d;
+    --surface-2: #1b2129;
+    --ink: #e8e6df;
+    --sub: #8a949e;
+    --gold: #d4a94e;
+    --gold-dim: #a3823c;
+    --green: #3fae6a;
+    --teal: #4aa8a0;
+    --line: rgba(255, 255, 255, 0.07);
+    --serif: "Noto Serif SC", "Source Han Serif SC", "STZhongsong", "SimSun", serif;
+    --sans: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  /* 仙女棒鼠标：金色实心五角星位于左上点击端点（热点 9,7），棒柄向右下延伸 */
+  :root {
+    --cur-ring: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36"><line x1="12" y1="12" x2="31" y2="31" stroke="%23a3823c" stroke-width="3" stroke-linecap="round"/><polygon points="9,0 11,5.25 16.61,5.53 12.23,9.05 13.7,14.47 9,11.4 4.3,14.47 5.77,9.05 1.39,5.53 7,5.25" fill="%23d4a94e"/></svg>') 9 7, auto;
+    --cur-gold: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36"><line x1="12" y1="12" x2="31" y2="31" stroke="%23a3823c" stroke-width="3.2" stroke-linecap="round"/><polygon points="9,0 11,5.25 16.61,5.53 12.23,9.05 13.7,14.47 9,11.4 4.3,14.47 5.77,9.05 1.39,5.53 7,5.25" fill="%23e8c464"/></svg>') 9 7, pointer;
+  }
+  body { cursor: var(--cur-ring); }
+  .chart canvas { cursor: var(--cur-ring) !important; }
+  a, button, [role="button"], .bgm-btn, select, summary { cursor: var(--cur-gold); }
+  ::selection { background: rgba(212, 169, 78, 0.35); color: #fff; }
+  /* 播放器区域：按钮本身已是金色圆环，光标用系统指针避免视觉重复 */
+  .bgm-wrap, .bgm-wrap button { cursor: pointer; }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--sans);
+    padding: 0 clamp(24px, 4vw, 72px) 72px; line-height: 1.6;
+  }
+  /* 随音乐呼吸的尘埃与光晕画布 */
+  #fx {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    width: 100%; height: 100%;
+  }
+  /* 鼠标特效顶层画布：压在内容之上、播放器之下 */
+  #fx-top {
+    position: fixed; inset: 0; z-index: 45; pointer-events: none;
+    width: 100%; height: 100%;
+  }
+  /* 放映机光束：hero 后方一道极淡的斜光 */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(ellipse 60% 45% at 18% -6%, rgba(212, 169, 78, 0.09), transparent 65%),
+      radial-gradient(ellipse 45% 40% at 88% 12%, rgba(63, 174, 106, 0.05), transparent 60%);
+  }
+  .wrap { max-width: clamp(1060px, 92vw, 1760px); margin: 0 auto; position: relative; z-index: 1; }
+
+  /* 胶片齿孔条 */
+  .filmstrip {
+    height: 22px; margin: 0 -16px 26px;
+    background:
+      repeating-linear-gradient(90deg,
+        transparent 0 10px, var(--surface-2) 10px 26px, transparent 26px 36px);
+    border-bottom: 1px solid var(--line);
+    opacity: 0.9;
+  }
+
+  header.hero { padding: 26px 4px 34px; animation: rise 0.7s ease both; }
+  .hero .kicker {
+    color: var(--sub); font-size: 12px; letter-spacing: 6px;
+    text-transform: uppercase; margin-bottom: 14px;
+  }
+  .hero .kicker b { color: var(--gold); font-weight: 600; }
+  .hero h1 {
+    font-family: var(--serif); font-weight: 700; font-size: clamp(38px, 6vw, 58px);
+    line-height: 1.18; letter-spacing: 2px;
+  }
+  .hero h1 .reel { color: var(--gold); }
+  .hero .subtitle { color: var(--sub); margin-top: 12px; font-size: 14px; }
+  .hero .subtitle .sep { margin: 0 10px; color: var(--gold-dim); }
+
+  /* 总览：胶片帧条（不对称，非等宽卡片） */
+  .frames {
+    display: flex; flex-wrap: wrap; margin-top: 30px;
+    border: 1px solid var(--line); border-radius: 14px;
+    background: linear-gradient(180deg, var(--surface), rgba(20, 24, 29, 0.6));
+    overflow: hidden;
+  }
+  .frame {
+    flex: 1 1 auto; min-width: 108px; padding: 16px 18px 14px;
+    border-right: 1px dashed var(--line); position: relative;
+  }
+  .frame:last-child { border-right: 0; }
+  .frame .n {
+    font-family: var(--serif); font-size: 34px; font-weight: 700;
+    color: var(--gold); font-variant-numeric: tabular-nums; line-height: 1.15;
+  }
+  .frame .n.plain { color: var(--ink); }
+  .frame .l { color: var(--sub); font-size: 12px; margin-top: 4px; letter-spacing: 1px; }
+
+  .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 18px; margin-top: 26px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    padding: 24px 26px 20px; position: relative;
+    transition: opacity 0.7s ease, transform 0.7s ease, border-color 0.25s ease;
+  }
+  .card.pre { opacity: 0; transform: translateY(18px); }
+  .card:hover { border-color: rgba(212, 169, 78, 0.35); }
+  .card h2 {
+    font-family: var(--serif); font-size: 19px; letter-spacing: 1.5px;
+    display: flex; align-items: baseline; gap: 10px;
+  }
+  .card h2 .no { color: var(--gold); font-size: 13px; letter-spacing: 2px; }
+  .card .desc { color: var(--sub); font-size: 12.5px; margin: 6px 0 14px; }
+  .c3 { grid-column: span 3; } .c4 { grid-column: span 4; }
+  .c6 { grid-column: span 6; } .c12 { grid-column: span 12; }
+  .chart { width: 100%; height: 320px; }
+  .chart.tall { height: 380px; }
+
+  /* 片单卡片：左侧金条像一格格胶片 */
+  .films { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+  .film {
+    display: flex; gap: 12px; align-items: flex-start;
+    border: 1px solid var(--line); border-left: 3px solid var(--gold-dim);
+    border-radius: 10px; padding: 13px 16px; background: var(--surface-2); font-size: 13px;
+  }
+  .poster {
+    width: 56px; height: 80px; border-radius: 6px; object-fit: cover; flex: none;
+    background: #10141a; border: 1px solid var(--line);
+  }
+  .poster-link { flex: none; line-height: 0; border-radius: 6px; }
+  .poster-link img, .poster-link .poster { display: block; }
+  .poster.ph {
+    display: flex; align-items: center; justify-content: center;
+    color: var(--gold); font-family: var(--serif); font-size: 20px;
+  }
+  .film-body { flex: 1; min-width: 0; }
+  .film:hover { border-left-color: var(--gold); border-color: rgba(212, 169, 78, 0.3); }
+  .film b { font-size: 14.5px; font-weight: 600; }
+  .film a { color: var(--ink); text-decoration: none; }
+  .film a:hover { color: var(--gold); }
+  .film .meta { color: var(--sub); margin: 5px 0; font-size: 12px; }
+  .film .stars { color: var(--gold); letter-spacing: 2.5px; font-size: 13px; }
+  .film .cmt { color: #b9c0b9; margin-top: 5px; line-height: 1.7; }
+  .film .cmt::before { content: "「"; color: var(--gold-dim); }
+  .film .cmt::after { content: "」"; color: var(--gold-dim); }
+
+  /* AI 人格卡片：一束打光 */
+  #card-ai {
+    background:
+      radial-gradient(ellipse 70% 90% at 12% 0%, rgba(212, 169, 78, 0.08), transparent 60%),
+      var(--surface);
+    border-color: rgba(212, 169, 78, 0.25);
+  }
+  #ai-persona { line-height: 2.1; font-size: 15px; color: #d9d7cf; }
+  #ai-oneliner { color: var(--gold); margin-top: 12px; font-family: var(--serif); font-size: 16px; }
+  .tag {
+    display: inline-block; border: 1px solid rgba(212, 169, 78, 0.4); color: var(--gold);
+    border-radius: 999px; padding: 2px 12px; margin: 0 8px 8px 0; font-size: 12px;
+  }
+  .tag small { color: var(--sub); margin-left: 4px; }
+  #funline { color: var(--sub); font-size: 13px; margin-top: 12px; }
+  #funline b { color: var(--gold); font-weight: 600; font-family: var(--serif); }
+  .words { line-height: 2.4; }
+  .bestline { color: var(--sub); font-size: 12px; margin-top: 10px; line-height: 1.9; }
+  .bestline b { color: var(--gold); font-weight: 600; }
+  .bestline .yr { color: var(--ink); font-family: var(--serif); }
+  .chip-row { margin-bottom: 10px; }
+  .tag.dim { color: var(--sub); border-color: var(--line); }
+  .tag.dim small { color: var(--gold-dim); }
+  .tv-card { align-self: stretch; }
+  .vs-wrap { display: flex; flex-wrap: wrap; align-items: stretch; gap: 16px 12px; }
+  #vs-tvmovie .tm-cell { flex: 1 1 180px; padding: 20px 12px; }
+  #vs-tvmovie .tm-big { font-size: 46px; }
+  .tm-insight { flex-basis: 100%; text-align: center; color: var(--gold); font-size: 28px; font-weight: 600; letter-spacing: 1px; margin-top: 20px; font-family: var(--serif); }
+  .tm-bar { height: 5px; background: var(--line); border-radius: 3px; margin-top: 10px; overflow: hidden; }
+  .tm-bar i { display: block; height: 100%; background: var(--gold); border-radius: 3px; }
+  .tm-cell {
+    flex: 1; text-align: center; padding: 18px 10px;
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px;
+  }
+  .tm-big { font-family: var(--serif); font-size: 40px; font-weight: 700; color: var(--gold); }
+  .tm-label { color: var(--ink); font-size: 14px; margin-top: 4px; letter-spacing: 2px; }
+  .tm-sub { color: var(--sub); font-size: 12px; margin-top: 6px; }
+  .tm-vs {
+    align-self: center; color: var(--gold-dim); font-family: var(--serif);
+    font-size: 18px; letter-spacing: 1px;
+  }
+
+  footer {
+    text-align: center; color: var(--sub); font-size: 12.5px; margin-top: 44px;
+    font-family: var(--serif); letter-spacing: 1px;
+  }
+  .share-btn {
+    margin-top: 14px; padding: 9px 22px; border-radius: 999px;
+    background: transparent; border: 1px solid rgba(212, 169, 78, 0.5);
+    color: var(--gold); font-family: var(--sans); font-size: 13px; letter-spacing: 2px;
+    transition: background 0.25s, border-color 0.25s;
+  }
+  .share-btn:hover { background: rgba(212, 169, 78, 0.12); border-color: var(--gold); }
+  .share-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+  footer .fin { color: var(--gold); font-size: 15px; letter-spacing: 8px; display: block; margin-bottom: 10px; }
+  footer a { color: var(--gold-dim); text-decoration: none; }
+
+  /* BGM 唱片按钮 */
+  .bgm-wrap {
+    position: fixed; right: 22px; bottom: 22px; z-index: 50;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .bgm-btn {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--surface-2); border: 1px solid rgba(212, 169, 78, 0.45);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--gold); box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+  }
+  .bgm-btn:hover { border-color: var(--gold); }
+  .bgm-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+  .bgm-btn svg { width: 24px; height: 24px; }
+  .bgm-btn .disc { animation: spin 6s linear infinite; animation-play-state: paused; transform-origin: center; }
+  .bgm-btn.playing .disc { animation-play-state: running; }
+  .bgm-side {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--surface-2); border: 1px solid var(--line);
+    color: var(--gold); display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.22s ease, transform 0.22s ease, border-color 0.22s ease;
+  }
+  .bgm-side.prev { transform: translateX(8px) scale(0.72); }
+  .bgm-side.next { transform: translateX(-8px) scale(0.72); }
+  .bgm-wrap:hover .bgm-side, .bgm-wrap:focus-within .bgm-side {
+    opacity: 1; transform: none; pointer-events: auto;
+  }
+  .bgm-side:hover { border-color: var(--gold); }
+  .bgm-side:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .bgm-side svg { width: 16px; height: 16px; }
+  .bgm-wrap .tip {
+    position: absolute; bottom: calc(100% + 12px); right: 0;
+    background: var(--surface-2); border: 1px solid var(--line); color: var(--sub);
+    border-radius: 8px; padding: 4px 10px; font-size: 12px; white-space: nowrap;
+    opacity: 0; pointer-events: none; transition: opacity 0.25s;
+  }
+  .bgm-wrap:hover .tip { opacity: 1; }
+
+  /* 章节导航（宽屏左侧） */
+  .toc {
+    position: fixed; left: 16px; top: 50%; transform: translateY(-50%); z-index: 40;
+    display: none; flex-direction: column; gap: 7px;
+  }
+  @media (min-width: 1500px) { .toc { display: flex; } body { padding-left: clamp(132px, 9vw, 190px); } }
+  .toc a {
+    color: var(--sub); text-decoration: none; font-size: 10.5px; letter-spacing: 1px;
+    opacity: 0.65; transition: opacity 0.2s, color 0.2s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .toc a::before {
+    content: ""; width: 6px; height: 6px; border-radius: 50%;
+    background: currentColor; opacity: 0.7;
+  }
+  .toc a.on, .toc a:hover { color: var(--gold); opacity: 1; }
+
+  @keyframes rise { from { opacity: 0; transform: translateY(16px); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .card, header.hero { animation: none; }
+    .bgm-btn .disc { animation: none; }
+    html { scroll-behavior: auto; }
+  }
+  #progress {
+    position: fixed; top: 0; left: 0; height: 2px; width: 0;
+    background: linear-gradient(90deg, var(--gold-dim), var(--gold));
+    z-index: 99; pointer-events: none;
+  }
+  @media print {
+    #fx, #fx-top, .toc, .bgm-wrap, .share-btn, .filmstrip { display: none !important; }
+    body { background: #fff; color: #111; padding: 0; }
+    body::before { display: none; }
+    .card { break-inside: avoid; border-color: #ddd; background: #fff;
+      box-shadow: none; opacity: 1 !important; transform: none !important; }
+    .num, .hero h1 .reel { color: #8a6c2e; }
+    a { color: inherit; }
+  }
+  @media (max-width: 760px) {
+    .c3, .c4, .c6 { grid-column: span 12; }
+    .frame { min-width: 46%; }
+    .hero h1 { letter-spacing: 1px; }
+  }
+  /* 宽屏自适应：用满空间，保持可读上限 */
+  @media (min-width: 1600px) {
+    body { padding-top: 8px; }
+    .hero h1 { font-size: clamp(44px, 4vw, 66px); }
+    .frame { padding: 20px 26px 18px; }
+    .frame .n { font-size: 38px; }
+    .chart { height: 360px; }
+    .chart.tall { height: 430px; }
+    .card { padding: 26px 30px 24px; }
+  }
+</style>
+</head>
+<body>
+<div id="progress" aria-hidden="true"></div>
+<canvas id="fx" aria-hidden="true"></canvas>
+<canvas id="fx-top" aria-hidden="true"></canvas>
+<nav class="toc" id="toc" aria-label="章节导航"></nav>
+<div class="filmstrip" aria-hidden="true"></div>
+<div class="wrap">
+  <header class="hero">
+    <div class="kicker">DOUBAN · <b>WRAPPED</b> · 个人观影年报</div>
+    <h1>我的豆瓣观影<span class="reel">年报</span></h1>
+    <p class="subtitle" id="subtitle">每一颗星，都是一次在场证明</p>
+    <div class="frames" id="overview"></div>
+    <p id="funline"></p>
+  </header>
+
+  <div class="grid">
+    <div class="card c12" id="card-ai" style="display:none; --i:0">
+      <h2><span class="no">序幕</span>AI 观影人格</h2>
+      <div class="desc" id="ai-tags"></div>
+      <p id="ai-persona"></p>
+      <p id="ai-oneliner"></p>
+    </div>
+
+    <div class="card c6" id="sec-01" data-sec="01" data-name="评分口味" style="--i:1"><h2><span class="no">01</span>评分口味</h2><div class="desc">我打几星 · 星星很少说谎</div><div id="chart-rating" class="chart"></div></div>
+    <div class="card c6" id="sec-02" data-sec="02" data-name="年度节奏" style="--i:2"><h2><span class="no">02</span>年度节奏</h2><div class="desc">每年看了多少、打分多苛刻（均为 10 分制）</div><div id="chart-yearly" class="chart"></div><div class="bestline" id="bestline"></div></div>
+    <div class="card c6" id="sec-03" data-sec="03" data-name="品味象限" style="--i:3"><h2><span class="no">03</span>品味象限</h2><div class="desc">每一部片都是一个点：横轴大众，纵轴我</div><div id="chart-quadrant" class="chart tall"></div></div>
+    <div class="card c6" id="sec-04" data-sec="04" data-name="观影日历" style="--i:4"><h2><span class="no">04</span>观影日历</h2><div class="desc" id="cal-desc">最近一年的每一天</div><select id="cal-year" aria-label="选择年份" style="margin:8px 0 2px;background:var(--surface-2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:12px"></select><div id="chart-calendar" class="chart tall"></div></div>
+    <div class="card c6" id="sec-05" data-sec="05" data-name="类型偏好" style="--i:5"><h2><span class="no">05</span>类型偏好</h2><div class="desc">我的均分 vs 豆瓣均分（均按 10 分制）</div><div id="chart-genre" class="chart tall"></div></div>
+    <div class="card c6" id="sec-06" data-sec="06" data-name="观影地图" style="--i:6"><h2><span class="no">06</span>观影地图</h2><div class="desc">制片国家/地区 top12</div><div id="chart-country" class="chart tall"></div></div>
+    <div class="card c6" id="sec-07" data-sec="07" data-name="年代考古" style="--i:7"><h2><span class="no">07</span>年代考古</h2><div class="desc">偏爱哪个年代的作品</div><div id="chart-decade" class="chart"></div></div>
+    <div class="card c6 tv-card" id="sec-08" data-sec="08" data-name="电影 vs 剧集" style="--i:10"><h2><span class="no">08</span>电影 vs 剧集</h2><div class="desc">两种叙事的分量</div><div class="vs-wrap" id="vs-tvmovie"></div></div>
+    <div class="card c6" id="sec-09" data-sec="09" data-name="常客导演" style="--i:8"><h2><span class="no">09</span>常客导演</h2><div class="desc">看得最多的导演 top15</div><div id="chart-director" class="chart"></div></div>
+
+    <div class="card c6" id="sec-10" data-sec="10" data-name="常客演员" style="--i:15"><h2><span class="no">10</span>常客演员</h2><div class="desc">看得最多的演员 top12</div><div id="chart-actor" class="chart"></div></div>
+    <div class="card c12" id="sec-11" data-sec="11" data-name="年度十佳" style="--i:11"><h2><span class="no">11</span>年度十佳</h2><div class="desc">我给出最高评价的作品</div><div class="films" id="films-top"></div></div>
+    <div class="card c12" style="--i:12" id="sec-12" data-sec="12" data-name="我的遗珠" id="card-gems"><h2><span class="no">12</span>我的遗珠</h2><div class="desc">我的评分远高于大众的「被低估」作品</div><div class="films" id="films-gems"></div></div>
+    <div class="card c12" style="--i:12" id="sec-13" data-sec="13" data-name="冷门佳片" id="card-niche"><h2><span class="no">13</span>冷门佳片</h2><div class="desc">豆瓣不足 5000 人评过、却被我郑重打上四星以上</div><div class="films" id="films-niche"></div></div>
+    <div class="card c12" style="--i:13" id="sec-14" data-sec="14" data-name="异见时刻" id="card-strict"><h2><span class="no">14</span>异见时刻</h2><div class="desc">大众打 8.5+ 而我只给两星以下——那些没打动我的</div><div class="films" id="films-strict"></div></div>
+
+    <div class="card c12" style="--i:13" id="sec-15" data-sec="15" data-name="短评高频词" id="card-words"><h2><span class="no">15</span>短评高频词</h2><div class="desc">这些年我在豆瓣留下的话里，最常出现的词</div><div class="words" id="words"></div></div>
+    <div class="card c6" style="--i:14" id="sec-16" data-sec="16" data-name="品味标签" id="card-tags"><h2><span class="no">16</span>品味标签</h2><div class="desc">我亲手贴在电影身上的词</div><div class="words" id="tag-chips"></div></div>
+    <div class="card c6" style="--i:14" id="sec-17" data-sec="17" data-name="想看方向" id="card-wish"><h2><span class="no">17</span>想看方向</h2><div class="desc" id="wish-desc">片单里排着队的，是什么类型</div><div class="words" id="wish-chips"></div></div>
+  </div>
+
+  <footer>
+    <span class="fin">— 全 片 完 —</span>
+    <span id="foot-count"></span> · 由 <a href="https://github.com/" id="repo-link">douban-wrapped</a> 生成 ·
+    配乐：Kevin MacLeod（incompetech.com）· CC BY 4.0 · <span id="gen-at"></span>
+    <br><button class="share-btn" id="share">生成分享卡片 PNG</button>
+  </footer>
+</div>
+
+<div class="bgm-wrap" id="bgm-wrap">
+  <span class="tip" id="bgm-tip">来点放映室配乐</span>
+  <button class="bgm-side prev" id="bgm-prev" aria-label="上一首" title="上一首">
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 6h2v12H7zM20 6l-9 6 9 6z"/></svg>
+  </button>
+  <button class="bgm-btn" id="bgm" aria-label="播放或暂停配乐" title="播放 / 暂停">
+    <svg class="disc" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.4"/>
+      <circle cx="12" cy="12" r="6.2" stroke="currentColor" stroke-width="0.8" opacity="0.55"/>
+      <circle cx="12" cy="12" r="2.6" fill="currentColor"/>
+    </svg>
+  </button>
+  <button class="bgm-side next" id="bgm-next" aria-label="下一首" title="下一首">
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15 6h2v12h-2zM4 6l9 6-9 6z"/></svg>
+  </button>
+</div>
+
+<script>
+const P = __PROFILE_JSON__;
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const stars = n => "★".repeat(n) + "☆".repeat(5 - n);
+
+/* ---------- ECharts 暗色公共配置 ---------- */
+const AXIS = { line: "rgba(255,255,255,0.14)", label: "#8a949e", split: "rgba(255,255,255,0.06)" };
+const TIP = { backgroundColor: "#1b2129", borderColor: "rgba(255,255,255,0.12)",
+              textStyle: { color: "#e8e6df" } };
+const GOLD = "#d4a94e", GREEN = "#4e8a63", TEAL = "#4aa8a0", MUTED = "#2e5c43", PURPLE = "#6d6585";
+const CHARTS = [];
+const PENDING = [];
+function doInitChart(id, option) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const c = echarts.init(el);
+  c.setOption(Object.assign({
+    textStyle: { fontFamily: "inherit" },
+    tooltip: Object.assign({}, TIP),
+  }, option));
+  CHARTS.push(c);
+}
+function mkChart(id, option) {
+  if (!("IntersectionObserver" in window)) { doInitChart(id, option); return; }
+  PENDING.push([id, option]);
+}
+addEventListener("resize", () => CHARTS.forEach(c => c.resize()));
+
+/* ---------- 总览 ---------- */
+(function overview() {
+  const o = P.overview;
+  const items = [
+    [o.watched, "看过", true], [o.movies + " / " + o.tv, "电影 / 剧集", false],
+    [o.rated, "评分", false], [o.commented, "短评", false], [o.long_comments != null ? o.long_comments : 0, "长评", false],
+    [o.avg_my == null ? "-" : +(o.avg_my * 2).toFixed(1), "我的均分", true], [o.avg_douban == null ? "-" : +(+o.avg_douban).toFixed(1), "豆瓣均分", false],
+  ];
+  document.getElementById("overview").innerHTML = items.map(([v, label, gold]) =>
+    `<div class="frame"><div class="n ${gold ? "" : "plain"}">${esc(v)}</div><div class="l">${esc(label)}</div></div>`).join("");
+  const bits = [];
+  if (o.first_mark) bits.push(`${o.first_mark} ~ ${o.last_mark}`);
+  bits.push(P.uid ? `${esc(P.uid)} 的观影记录` : "我的观影记录");
+  document.getElementById("subtitle").innerHTML = bits.join('<span class="sep">·</span>');
+  document.getElementById("gen-at").textContent = "生成于 " + P.generated_at;
+  const total = (o.watched || 0) + (o.wish || 0) + (o.watching || 0);
+  document.getElementById("foot-count").textContent = `本片由 ${total} 次标记放映完毕`;
+  const fs = P.fun_stats || {};
+  const funBits = [];
+  if (fs.longest_streak > 1) funBits.push(`连续观影最长 <b>${fs.longest_streak}</b> 天`);
+  if (fs.busiest_month) funBits.push(`最勤月份 <b>${esc(fs.busiest_month)}</b>（${fs.busiest_month_count} 部）`);
+  if (funBits.length) document.getElementById("funline").innerHTML = funBits.join('<span class="sep"> · </span>');
+})();
+
+/* ---------- 01 评分口味 ---------- */
+mkChart("chart-rating", {
+  grid: { left: 40, right: 16, top: 30, bottom: 28 },
+  xAxis: { type: "category", data: ["1星","2星","3星","4星","5星","未评"],
+           axisLine: { lineStyle: { color: AXIS.line } }, axisLabel: { color: AXIS.label } },
+  yAxis: { type: "value", minInterval: 1, axisLabel: { color: AXIS.label },
+           splitLine: { lineStyle: { color: AXIS.split } } },
+  series: [{
+    type: "bar", barWidth: "45%", label: { show: true, position: "top", color: "#b9b29a" },
+    itemStyle: { borderRadius: [6, 6, 0, 0],
+      color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+        { offset: 0, color: GOLD }, { offset: 1, color: "#8a6c2e" }]) },
+    data: [1,2,3,4,5].map(k => P.rating_distribution[String(k)] || 0).concat([P.unrated]),
+  }],
+});
+
+/* ---------- 02 年度节奏 ---------- */
+mkChart("chart-yearly", {
+  tooltip: Object.assign({ trigger: "axis" }, TIP),
+  legend: { data: ["部数", "我的均分", "豆瓣均分"], top: 0, textStyle: { color: AXIS.label } },
+  grid: { left: 40, right: 46, top: 34, bottom: 28 },
+  xAxis: { type: "category", data: (P.ratings_by_year || []).map(y => y.year),
+           axisLine: { lineStyle: { color: AXIS.line } }, axisLabel: { color: AXIS.label } },
+  yAxis: [
+    { type: "value", minInterval: 1, axisLabel: { color: AXIS.label }, splitLine: { lineStyle: { color: AXIS.split } } },
+    { type: "value", max: 10, splitLine: { show: false }, axisLabel: { color: AXIS.label } },
+  ],
+  series: [
+    { name: "部数", type: "bar", barWidth: "38%",
+      itemStyle: { borderRadius: [4,4,0,0], color: MUTED },
+      data: (P.ratings_by_year || []).map(y => y.count) },
+    { name: "我的均分", type: "line", yAxisIndex: 1, smooth: true,
+      itemStyle: { color: GOLD }, lineStyle: { color: GOLD, width: 2 },
+      data: (P.ratings_by_year || []).map(y => y.avg_my == null ? null : +(y.avg_my * 2).toFixed(2)) },
+    { name: "豆瓣均分", type: "line", yAxisIndex: 1, smooth: true,
+      itemStyle: { color: TEAL }, lineStyle: { color: TEAL, width: 2, type: "dashed" },
+      data: (P.ratings_by_year || []).map(y => y.avg_douban == null ? null : +y.avg_douban.toFixed(2)) },
+  ],
+});
+
+/* ---------- 横向条形通用 ---------- */
+function hbar(elId, stats, opts = {}) {
+  const data = [...stats].reverse();
+  const nameW = Math.min(420, Math.max(76, Math.round(Math.max(0, ...data.map(s => String(s.name || "").length)) * 14 + 16)));
+  mkChart(elId, {
+    tooltip: Object.assign({ trigger: "axis", axisPointer: { type: "shadow" } }, TIP),
+    legend: opts.myScore ? { top: 0, textStyle: { color: AXIS.label } } : undefined,
+    grid: { left: nameW + 8, right: 44, top: opts.myScore ? 30 : 16, bottom: 24 },
+    xAxis: { type: "value", minInterval: 1, axisLabel: { color: AXIS.label },
+             splitLine: { lineStyle: { color: AXIS.split } } },
+    yAxis: { type: "category", data: data.map(s => s.name),
+             axisLine: { lineStyle: { color: AXIS.line } }, axisLabel: { color: AXIS.label, fontSize: 12 } },
+    series: [
+      { name: "部数", type: "bar", barWidth: "52%",
+        data: data.map(s => s.count), label: { show: true, position: "right", color: "#b9b29a" },
+        itemStyle: { borderRadius: [0, 4, 4, 0], color: opts.color || GREEN } },
+      ...(opts.myScore ? [{
+        name: "我的均分", type: "scatter",
+        data: data.map(s => [s.avg_my == null ? null : +(s.avg_my * 2).toFixed(2), s.name]),
+        symbolSize: 10, itemStyle: { color: GOLD, borderColor: "#0b0e11", borderWidth: 2 },
+        tooltip: { formatter: p => `${p.name}<br>我的均分: ${p.value[0] ?? "-"}` },
+      }] : []),
+    ],
+  });
+}
+hbar("chart-genre", (P.major_genre_stats || []).slice(0, 12), { myScore: true });
+hbar("chart-country", P.country_stats || [], { color: TEAL });
+hbar("chart-director", P.director_stats || [], { color: PURPLE, wideNames: true });
+hbar("chart-actor", P.actor_stats || [], { color: TEAL });
+
+/* ---------- 05 年代考古 ---------- */
+mkChart("chart-decade", {
+  grid: { left: 40, right: 16, top: 20, bottom: 28 },
+  xAxis: { type: "category", data: Object.keys(P.decade_stats || {}),
+           axisLine: { lineStyle: { color: AXIS.line } }, axisLabel: { color: AXIS.label } },
+  yAxis: { type: "value", minInterval: 1, axisLabel: { color: AXIS.label },
+           splitLine: { lineStyle: { color: AXIS.split } } },
+  series: [{ type: "bar", barWidth: "55%", label: { show: true, position: "top", color: "#b9b29a" },
+    itemStyle: { borderRadius: [6,6,0,0], color: "#57847c" },
+    data: Object.values(P.decade_stats || {}) }],
+});
+
+/* ---------- 片单卡片 ---------- */
+window.__posterFail = function (img) {
+  if (img.dataset.fallback === "proxy") {
+    img.dataset.fallback = "done";
+    img.src = "/output/cover?url=" + encodeURIComponent(img.getAttribute("src"));
+  } else {
+    img.style.display = "none";
+    if (img.nextElementSibling) img.nextElementSibling.style.display = "flex";
+  }
+};
+
+function filmCards(elId, films, showDiff) {
+  const el = document.getElementById(elId);
+  if (!films || !films.length) { el.closest(".card").style.display = "none"; return; }
+  el.innerHTML = films.map(f => {
+    const orig = f.original_title && f.original_title !== f.title
+      && !f.title.includes(f.original_title) ? f.original_title : "";
+    const ph = (f.title || "?").trim().slice(0, 1);
+    const poster = f.cover
+      ? `<a href="${esc(f.url)}" target="_blank" rel="noopener" class="poster-link"><img class="poster" src="${esc(f.cover)}" data-fallback="proxy" loading="lazy" referrerpolicy="no-referrer" alt="" onerror="window.__posterFail(this)"><div class="poster ph" style="display:none">${esc(ph)}</div></a>`
+      : `<a href="${esc(f.url)}" target="_blank" rel="noopener" class="poster-link"><div class="poster ph">${esc(ph)}</div></a>`;
+    return `
+    <div class="film">
+      ${poster}
+      <div class="film-body">
+        <a href="${esc(f.url)}" target="_blank" rel="noopener"><b>${esc(f.title)}</b></a>
+        ${orig ? `<span style="color:var(--sub)"> ${esc(orig)}</span>` : ""}
+        <div class="meta">${f.year ? esc(f.year) + " · " : ""}
+          <span class="stars">${stars(f.my_rating || 0)}</span>
+          ${f.douban_rating ? ` · 豆瓣 ${f.douban_rating}` : ""}
+          ${showDiff ? ` · 差值 ${(f.my_rating * 2 - f.douban_rating).toFixed(1)}` : ""}
+        </div>
+        ${f.comment ? `<div class="cmt">${esc(f.comment)}</div>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+}
+filmCards("films-top", P.top_rated);
+filmCards("films-gems", P.gems, true);
+filmCards("films-niche", P.niche_gems);
+filmCards("films-strict", P.strict_picks);
+
+/* ---------- 短评高频词 ---------- */
+(function words() {
+  const list = P.top_bigrams || [];
+  const el = document.getElementById("words");
+  if (!list.length) { document.getElementById("sec-15").style.display = "none"; return; }
+  el.innerHTML = list.map(w =>
+    `<span class="tag">${esc(w.word)}<small>×${w.count}</small></span>`).join("");
+})();
+
+/* ---------- AI 观影人格 ---------- */
+(function ai() {
+  const el = document.getElementById("card-ai");
+  const n = P.narrative;
+  const rp = P.rule_persona;
+  if (n && n.persona) {
+    el.style.display = "";
+    el.querySelector("h2").innerHTML = '<span class="no">序幕</span>AI 观影人格';
+    document.getElementById("ai-persona").textContent = n.persona;
+    document.getElementById("ai-oneliner").textContent = n.one_liner ? "—— " + n.one_liner : "";
+    const tags = Array.isArray(n.tags) ? n.tags : [];
+    document.getElementById("ai-tags").innerHTML =
+      tags.map(t => `<span class="tag">#${esc(t)}</span>`).join("");
+    return;
+  }
+  if (rp && rp.persona) {
+    el.style.display = "";
+    el.querySelector("h2").innerHTML = '<span class="no">序章</span>观影人格';
+    document.getElementById("ai-persona").textContent = rp.persona;
+    document.getElementById("ai-oneliner").textContent = rp.one_liner ? "—— " + rp.one_liner : "";
+    const tags = Array.isArray(rp.tags) ? rp.tags : [];
+    document.getElementById("ai-tags").innerHTML =
+      tags.map(t => `<span class="tag">${esc(t)}</span>`).join("");
+    document.getElementById("card-ai").querySelector(".desc").textContent = "基于统计的规则版（配置 AI Key 可升级为 AI 叙事）";
+    return;
+  }
+  el.style.display = "none";
+})();
+
+/* ---------- 03 品味象限 ---------- */
+(function quadrant() {
+  const Q = P.quadrant || [];
+  if (!Q.length) { document.getElementById("chart-quadrant").closest(".card").style.display = "none"; return; }
+  const avgMy10 = Q.reduce((acc, q) => acc + q.my, 0) / Q.length * 2;
+  const avgDb10 = Q.reduce((acc, q) => acc + q.db, 0) / Q.length * 2;
+  const mx = +avgMy10.toFixed(2), dx = +avgDb10.toFixed(2);
+  const pts = Q.map(q => {
+    const my10 = +(q.my * 2).toFixed(2), db10 = +(q.db * 2).toFixed(2);
+    return { value: [db10, my10, +(my10 - db10).toFixed(2)], name: q.t, y: q.y };
+  });
+  mkChart("chart-quadrant", {
+    tooltip: Object.assign({
+      formatter: pt => "<b>" + pt.data.name + "</b>" + (pt.data.y ? " (" + pt.data.y + ")" : "") +
+        "<br>豆瓣 " + pt.value[0] + " 分 · 我的 " + pt.value[1] + " 分" +
+        "<br>" + (pt.value[2] >= 0 ? "高于大众 " + pt.value[2] : "低于大众 " + Math.abs(pt.value[2])) + " 分",
+    }, TIP),
+    grid: { left: 48, right: 24, top: 28, bottom: 42 },
+    xAxis: { name: "豆瓣(分)", nameLocation: "middle", nameGap: 26, min: 0, max: 10,
+      axisLine: { lineStyle: { color: AXIS.line } }, axisLabel: { color: AXIS.label },
+      splitLine: { lineStyle: { color: AXIS.split } } },
+    yAxis: { name: "我的(分)", min: 0, max: 10,
+      axisLine: { lineStyle: { color: AXIS.line } }, axisLabel: { color: AXIS.label },
+      splitLine: { lineStyle: { color: AXIS.split } } },
+    visualMap: { show: false, dimension: 2, min: -5, max: 5,
+      inRange: { color: ["#4a6b8a", "#6d6585", "#c9a24a"] } },
+    series: [{
+      type: "scatter",
+      symbolSize: v => 9 + (v[1] - 5) * 0.7,
+      data: pts,
+      itemStyle: { opacity: 0.85, borderColor: "#0b0e11", borderWidth: 1 },
+      emphasis: { focus: "self", itemStyle: { borderColor: "#fff0c0", borderWidth: 2 } },
+      markArea: { silent: true, data: [
+        [{ xAxis: dx, yAxis: mx, itemStyle: { color: "rgba(212,169,78,0.06)" } }, { xAxis: 10, yAxis: 10 }],
+        [{ xAxis: 0, yAxis: mx, itemStyle: { color: "rgba(78,138,99,0.06)" } }, { xAxis: dx, yAxis: 10 }],
+        [{ xAxis: 0, yAxis: 0, itemStyle: { color: "rgba(109,101,133,0.06)" } }, { xAxis: dx, yAxis: mx }],
+        [{ xAxis: dx, yAxis: 0, itemStyle: { color: "rgba(180,95,90,0.06)" } }, { xAxis: 10, yAxis: mx }],
+      ] },
+      markLine: { silent: true, symbol: "none", label: { color: AXIS.label, fontSize: 10 },
+        lineStyle: { color: "rgba(255,255,255,0.28)", type: "dashed" },
+        data: [{ yAxis: mx, label: { formatter: "我的均分" } },
+               { xAxis: dx, label: { formatter: "大众均分" } }] },
+    }],
+  });
+})();
+
+/* ---------- 04 观影日历 ---------- */
+(function calendarChart() {
+  const calAll = P.calendar_all || P.calendar || {};
+  const yr = P.year_range || (P.busiest_year ? [P.busiest_year, P.busiest_year] : []);
+  const sel = document.getElementById("cal-year");
+  const desc = document.getElementById("cal-desc");
+  const chartId = "chart-calendar";
+  if (!Object.keys(calAll).length || !yr.length) {
+    document.getElementById(chartId).closest(".card").style.display = "none";
+    return;
+  }
+  const years = [];
+  for (let y = +yr[0]; y <= +yr[1]; y++) if (!isNaN(y)) years.push(String(y));
+  const descYears = years.slice().reverse();
+  sel.innerHTML = descYears.map(y => '<option value="' + y + '">' + y + '</option>').join("");
+  const defaultYear = descYears[0];
+  sel.value = defaultYear;
+  function render(year) {
+    const data = Object.keys(calAll).filter(d => d.indexOf(year + "-") === 0)
+                      .map(d => [d, calAll[d]]);
+    const peak = Math.max.apply(null, data.map(x => x[1]).concat([1]));
+    desc.textContent = year + " 年的每一天（最疯狂的一天：" + peak + " 部）";
+    const opt = {
+      tooltip: Object.assign({ formatter: pt => pt.value[0] + "：" + pt.value[1] + " 部" }, TIP),
+      visualMap: { show: false, min: 1, max: peak,
+        inRange: { color: ["#1d2723", "#2b4c39", "#44775a", "#9a7b3f"] } },
+      calendar: {
+        range: year, cellSize: ["auto", "auto"], left: 46, right: 16, top: 20, bottom: 8,
+        itemStyle: { color: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.04)" },
+        splitLine: { show: false },
+        dayLabel: { color: "#8a949e", nameMap: ["日", "一", "二", "三", "四", "五", "六"] },
+        monthLabel: { color: "#8a949e" }, yearLabel: { color: "#8a949e" },
+      },
+      series: [{ type: "heatmap", coordinateSystem: "calendar", data: data }],
+    };
+    const inst = echarts.getInstanceByDom(document.getElementById(chartId));
+    if (inst) inst.setOption(opt, true); else mkChart(chartId, opt);
+  }
+  sel.addEventListener("change", () => render(sel.value));
+  render(defaultYear);
+})();
+
+/* ---------- 10 电影 vs 剧集 ---------- */
+(function tvmovie() {
+  const tm = P.tv_movie || {};
+  if (!tm.movie) return;
+  const m = tm.movie, t = tm.tv || { count: 0, avg_my: null, avg_douban: null };
+  const total = (m.count || 0) + (t.count || 0) || 1;
+  const mp = Math.round((m.count || 0) / total * 100), tp = 100 - mp;
+  const cell = (label, d, pct) => '<div class="tm-cell">' +
+    '<div class="tm-big">' + (d.count || 0) + '</div>' +
+    '<div class="tm-label">' + label + '</div>' +
+    '<div class="tm-sub">占比 ' + pct + '% · 我的均分 ' +
+      (d.avg_my == null ? "-" : +(d.avg_my * 2).toFixed(1)) + ' 分 · 豆瓣 ' + (d.avg_douban ?? "-") + ' 分</div>' +
+    '<div class="tm-bar"><i style="width:' + pct + '%"></i></div></div>';
+  const lean = (m.count || 0) === (t.count || 0) ? "电影与剧集，你对两者一视同仁。"
+    : (m.count || 0) > (t.count || 0) ? "电影是你的主战场，剧集只是偶尔的加餐。"
+    : "剧集同样占据了你大把时光，长篇的沉浸你并不排斥。";
+  document.getElementById("vs-tvmovie").innerHTML =
+    cell("电影", m, mp) + '<div class="tm-vs">VS</div>' + cell("剧集", t, tp) +
+    '<div class="tm-insight">' + lean + '</div>';
+})();
+
+/* ---------- 16 想看方向 ---------- */
+(function wish() {
+  const ws = P.wish_stats || {};
+  if (!ws.count) { document.getElementById("sec-17").style.display = "none"; return; }
+  const chips = (ws.genres || []).map(g =>
+    '<span class="tag">' + esc(g.name) + '<small>×' + g.count + '</small></span>').join("");
+  const lands = (ws.countries || []).slice(0, 6).map(g =>
+    '<span class="tag dim">' + esc(g.name) + '<small>×' + g.count + '</small></span>').join("");
+  document.getElementById("wish-chips").innerHTML =
+    '<div class="chip-row">' + chips + '</div><div class="chip-row">' + lands + '</div>';
+  document.getElementById("wish-desc").textContent =
+    '片单里排着队 ' + ws.count + ' 部，最想看的是这些';
+})();
+
+/* ---------- 15 品味标签 ---------- */
+(function tagsCard() {
+  const list = P.top_tags || [];
+  const el = document.getElementById("tag-chips");
+  if (!list.length) { document.getElementById("sec-16").style.display = "none"; return; }
+  el.innerHTML = list.map(t =>
+    '<span class="tag">' + esc(t.name) + '<small>×' + t.count + '</small></span>').join("");
+})();
+
+
+/* ---------- 章节导航 / 懒渲染 / 入场动画 / 数字滚动 ---------- */
+(function lazyCharts() {
+  if (!PENDING.length) return;
+  const io = new IntersectionObserver((ents) => {
+    for (const en of ents) {
+      if (!en.isIntersecting) continue;
+      const i = PENDING.findIndex(x => document.getElementById(x[0]) === en.target);
+      if (i >= 0) {
+        const job = PENDING.splice(i, 1)[0];
+        doInitChart(job[0], job[1]);
+      }
+      io.unobserve(en.target);
+    }
+  }, { rootMargin: "300px" });
+  PENDING.forEach(([id]) => {
+    const el = document.getElementById(id);
+    if (el) io.observe(el);
+  });
+})();
+
+(function revealCards() {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches ||
+      !("IntersectionObserver" in window)) return;
+  const io = new IntersectionObserver((ents) => {
+    for (const en of ents) {
+      if (!en.isIntersecting) continue;
+      en.target.classList.remove("pre");
+      io.unobserve(en.target);
+    }
+  }, { rootMargin: "140px" });
+  document.querySelectorAll(".card").forEach(c => {
+    if (c.getBoundingClientRect().top > innerHeight) c.classList.add("pre");
+    io.observe(c);
+  });
+})();
+
+(function countUp() {
+  const io = new IntersectionObserver((ents) => {
+    for (const en of ents) {
+      if (!en.isIntersecting) continue;
+      io.unobserve(en.target);
+      const el = en.target;
+      const txt = el.textContent.trim();
+      if (!/^\d+$/.test(txt)) continue;
+      const target = +txt;
+      const t0 = performance.now(), dur = 1100;
+      (function tick(now) {
+        const p = Math.min(1, (now - t0) / dur);
+        el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3)));
+        if (p < 1) requestAnimationFrame(tick);
+        else el.textContent = String(target);
+      })(t0);
+    }
+  });
+  document.querySelectorAll("#overview .frame .n").forEach(n => io.observe(n));
+})();
+
+(function progressBar() {
+  const bar = document.getElementById("progress");
+  if (!bar) return;
+  addEventListener("scroll", () => {
+    const h = document.documentElement;
+    const p = h.scrollTop / Math.max(1, h.scrollHeight - h.clientHeight);
+    bar.style.width = (p * 100).toFixed(1) + "%";
+  }, { passive: true });
+})();
+
+(function bestline() {
+  const ys = (P.ratings_by_year || []).filter(y => y.best);
+  const el = document.getElementById("bestline");
+  if (!el) return;
+  if (!ys.length) { el.style.display = "none"; return; }
+  el.innerHTML = ys.map(y =>
+    '<span class="yr">' + y.year + '</span> <b>' + esc(y.best) + '</b>' +
+    (y.best_stars ? '（' + stars(y.best_stars) + '）' : '')
+  ).join(" · ");
+})();
+
+(function toc() {
+  const rail = document.getElementById("toc");
+  if (!rail) return;
+  const secs = [...document.querySelectorAll("[data-sec]")];
+  if (!secs.length) return;
+  rail.innerHTML = secs.map(c =>
+    '<a href="#' + c.id + '" data-t="' + c.dataset.sec + '">' +
+    c.dataset.sec + " " + c.dataset.name + "</a>").join("");
+  const links = [...rail.children];
+  const io = new IntersectionObserver((ents) => {
+    for (const en of ents) {
+      if (!en.isIntersecting) continue;
+      links.forEach(a =>
+        a.classList.toggle("on", a.getAttribute("href") === "#" + en.target.id));
+    }
+  }, { rootMargin: "-35% 0px -55% 0px" });
+  secs.forEach(c => io.observe(c));
+})();
+
+
+/* ---------- 分享卡片生成器：canvas 绘制 1080×1440 PNG ---------- */
+(function share() {
+  const btn = document.getElementById("share");
+  if (!btn) return;
+  const esc2 = t => String(t == null ? "" : t);
+  btn.addEventListener("click", () => {
+    const W = 1080, H = 1440;
+    const cv = document.createElement("canvas");
+    cv.width = W; cv.height = H;
+    const c = cv.getContext("2d");
+    const GOLD = "#d4a94e", INK = "#e8e6df", SUB = "#8a949e";
+    const serif = '"Noto Serif SC","STZhongsong","SimSun",serif';
+
+    // 底色 + 光晕
+    c.fillStyle = "#0b0e11"; c.fillRect(0, 0, W, H);
+    let g = c.createRadialGradient(W * 0.25, -80, 0, W * 0.25, -80, 900);
+    g.addColorStop(0, "rgba(212,169,78,0.16)"); g.addColorStop(1, "rgba(212,169,78,0)");
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+
+    // 胶片齿孔
+    c.fillStyle = "rgba(232,230,223,0.14)";
+    for (let x = 34; x < W - 20; x += 44) { c.fillRect(x, 26, 24, 14); c.fillRect(x, H - 40, 24, 14); }
+
+    // 标题
+    c.textBaseline = "alphabetic";
+    c.fillStyle = SUB; c.font = '24px "Microsoft YaHei",sans-serif';
+    c.fillText("DOUBAN · WRAPPED · 个人观影年报", 90, 150);
+    c.fillStyle = INK; c.font = '700 84px ' + serif;
+    c.fillText("我的豆瓣观影", 90, 260);
+    c.fillStyle = GOLD;
+    c.fillText("年报", 90 + c.measureText("我的豆瓣观影").width, 260);
+    const o = P.overview;
+    c.fillStyle = SUB; c.font = '26px "Microsoft YaHei",sans-serif';
+    c.fillText((o.first_mark || "") + " ~ " + (o.last_mark || ""), 90, 320);
+
+    // 数据帧
+    const stats = [
+      ["看过", o.watched], ["评分", o.rated], ["短评", o.commented],
+      ["我的均分", o.avg_my == null ? "-" : +(o.avg_my * 2).toFixed(1)], ["豆瓣均分", o.avg_douban],
+      ["电影/剧集", o.movies + "/" + o.tv],
+    ];
+    stats.forEach((st, i) => {
+      const col = i % 3, row = Math.floor(i / 3);
+      const x = 90 + col * 310, y = 430 + row * 190;
+      c.strokeStyle = "rgba(255,255,255,0.12)";
+      c.strokeRect(x, y, 280, 150);
+      c.fillStyle = GOLD; c.font = '700 64px ' + serif;
+      c.fillText(esc2(st[1]), x + 26, y + 78);
+      c.fillStyle = SUB; c.font = '22px "Microsoft YaHei",sans-serif';
+      c.fillText(st[0], x + 26, y + 118);
+    });
+
+    // 年度十佳前五
+    c.fillStyle = INK; c.font = '40px ' + serif;
+    c.fillText("年度十佳", 90, 940);
+    (P.top_rated || []).slice(0, 5).forEach((f, i) => {
+      const y = 1000 + i * 66;
+      c.fillStyle = GOLD; c.font = '30px ' + serif;
+      c.fillText("★".repeat(f.my_rating || 0), 90, y);
+      c.fillStyle = INK; c.font = '28px "Microsoft YaHei",sans-serif';
+      c.fillText(esc2(f.title).slice(0, 22), 240, y);
+      c.fillStyle = SUB;
+      c.fillText("豆瓣 " + (f.douban_rating ?? "-"), 720, y);
+    });
+
+    // 页脚
+    c.fillStyle = SUB; c.font = '22px "Microsoft YaHei",sans-serif';
+    c.fillText("douban-wrapped · " + P.generated_at, 90, H - 90);
+
+    btn.textContent = "已生成，正在下载…";
+    const a = document.createElement("a");
+    a.download = "douban-wrapped-card.png";
+    a.href = cv.toDataURL("image/png");
+    a.click();
+    setTimeout(() => { btn.textContent = "生成分享卡片 PNG"; }, 2500);
+  });
+})();
+
+
+/* ---------- BGM：舒缓钢琴轻音乐歌单 ----------
+   曲目：Kevin MacLeod（incompetech.com）· CC BY 4.0，随报告页分发于 music/ 目录。
+   页面打开即尝试渐入播放（被浏览器策略拦截时退到首次交互），
+   歌单播完自动循环；连续 3 次启动失败（如单文件分享缺 music 目录）则隐藏按钮。 */
+(function bgm() {
+  const btn = document.getElementById("bgm");
+  const wrap = document.getElementById("bgm-wrap");
+  const tip = document.getElementById("bgm-tip");
+  const TRACKS = [
+    "music/Gymnopedie No 1.mp3",
+    "music/Meditation Impromptu 02.mp3",
+    "music/Dreamy Flashback.mp3",
+  ];
+  const VOLUME = 0.5, FADE_IN_MS = 3000, FADE_OUT_MS = 900;
+  const audio = new Audio();
+  audio.id = "bgm-audio";
+  audio.preload = "auto";
+  audio.style.display = "none";
+  document.body.appendChild(audio);
+  let idx = 0, playing = false, fadeTimer = null, fails = 0;
+
+  function setState() {
+    document.body.dataset.bgm = playing ? "on" : "off";
+  }
+
+  function fade(target, ms) {
+    clearInterval(fadeTimer);
+    const from = audio.volume, t0 = performance.now();
+    fadeTimer = setInterval(() => {
+      const p = Math.min(1, (performance.now() - t0) / ms);
+      audio.volume = +(from + (target - from) * p).toFixed(3);
+      if (p >= 1) clearInterval(fadeTimer);
+    }, 50);
+  }
+
+  function trackName(i) {
+    return TRACKS[i].split("/").pop().replace(/\.mp3$/, "");
+  }
+  function load(i) {
+    idx = ((i % TRACKS.length) + TRACKS.length) % TRACKS.length;
+    audio.src = encodeURI(TRACKS[idx]);
+    tip.textContent = "\u266a " + trackName(idx);
+  }
+  function switchTrack(delta) {
+    const wasPlaying = playing;
+    load(idx + delta);
+    if (wasPlaying) audio.play().catch(() => {});
+  }
+  document.getElementById("bgm-prev").addEventListener("click", () => switchTrack(-1));
+  document.getElementById("bgm-next").addEventListener("click", () => switchTrack(1));
+
+  async function start() {
+    if (playing) return true;
+    if (!audio.src) load(0);
+    audio.volume = VOLUME;
+    try {
+      await audio.play();
+    } catch (e) {
+      audio.volume = VOLUME;  // 播放被拦也要保持音量，交互后直接出声
+      return false;  // 自动播放被拦，等首次交互
+    }
+    playing = true;
+    clearInterval(fadeTimer);  // 不再把音量从 0 淡入，避免无声等待
+    btn.classList.add("playing");
+    setState();
+    return true;
+  }
+
+  function stop() {
+    playing = false;
+    fade(0, FADE_OUT_MS);
+    setTimeout(() => { if (!playing) audio.pause(); }, FADE_OUT_MS + 100);
+    btn.classList.remove("playing");
+    setState();
+  }
+
+  function giveUp() {
+    fails += 1;
+    // 不再因自动播放策略拦截而隐藏播放器：保留按钮，用户点击即可播放。
+    if (fails >= 3 && audio.error) {
+      wrap.style.display = "none";
+      document.body.dataset.bgm = "unavailable";
+    }
+  }
+
+  audio.addEventListener("ended", () => {
+    load(idx + 1);                 // 歌单循环
+    audio.play().catch(() => {});
+  });
+  audio.addEventListener("error", () => {
+    if (!playing) { giveUp(); return; }
+    load(idx + 1);
+    audio.play().catch(() => {});
+  });
+
+  let armTimer = null;
+  function disarm() {
+    if (armTimer) { clearTimeout(armTimer); armTimer = null; }
+    if (!armHandler) return;
+    for (const ev of armEvents) window.removeEventListener(ev, armHandler, true);
+    armHandler = null;
+  }
+  // 播放按钮点击：切换播放 / 暂停
+  btn.addEventListener("click", () => {
+    if (playing) { disarm(); stop(); } else { disarm(); start(); }
+  });
+
+  // 浏览器自动播放被拦截时，首次任意交互立即起播（捕获阶段，不再延迟 80ms）
+  let armHandler = null, armEvents = [];
+  function arm() {
+    armEvents = ["pointerdown", "keydown", "touchend", "wheel"];
+    armHandler = (e) => {
+      if (wrap.contains(e.target)) return;  // 播放器自身的按钮交给按钮处理，避免重复触发
+      start().then(ok => { if (ok) disarm(); });
+    };
+    for (const ev of armEvents) window.addEventListener(ev, armHandler, { passive: true, capture: true });
+  }
+
+  window.addEventListener("load", async () => {
+    const ok = await start();
+    if (!ok) { giveUp(); arm(); }
+  });
+})();
+/* ---------- 背景特效：随音乐呼吸的尘埃与光晕 + 光标拖尾/涟漪 ----------
+   底层画布(#fx)：低频能量驱动的尘埃与 hero 柔光（内容之下）；
+   顶层画布(#fx-top)：光标拖尾金星与点击涟漪（内容之上，每帧清屏）。
+   幅度刻意压低，保持「深夜放映室」的安静。尊重 prefers-reduced-motion。 */
+(function fx() {
+  const canvas = document.getElementById("fx");
+  const canvasTop = document.getElementById("fx-top");
+  if (!canvas || !canvasTop) return;
+  const ctx2d = canvas.getContext("2d");
+  const ctxTop = canvasTop.getContext("2d");
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduced) {
+    canvas.style.display = "none";
+    canvasTop.style.display = "none";
+    return;
+  }
+
+  const DPR = Math.min(window.devicePixelRatio || 1, 1.5);
+  let W = 0, H = 0;
+  function resize() {
+    W = canvas.width = canvasTop.width = innerWidth * DPR;
+    H = canvas.height = canvasTop.height = innerHeight * DPR;
+    for (const c of [canvas, canvasTop]) {
+      c.style.width = innerWidth + "px";
+      c.style.height = innerHeight + "px";
+    }
+  }
+  addEventListener("resize", resize);
+  resize();
+
+  const dust = [];
+  for (let i = 0; i < 42; i++) {
+    dust.push({
+      x: Math.random(), y: Math.random(),
+      r: 0.6 + Math.random() * 1.8,
+      vy: 0.12 + Math.random() * 0.3,
+      ph: Math.random() * Math.PI * 2,
+      gold: Math.random() < 0.45,
+      a: 0.10 + Math.random() * 0.25,
+    });
+  }
+
+  const audio = document.getElementById("bgm-audio");
+  let analyser = null, freq = null, level = 0;
+  // 不使用 WebAudio 接管 <audio>：createMediaElementSource 在 AudioContext
+  // 未恢复时会让音乐静音。保留 HTMLAudioElement 原生播放，音量淡入淡出即可。
+  function wire() { return; }
+  wire();
+  ["pointerdown", "keydown", "touchend"].forEach(ev =>
+    addEventListener(ev, wire, { passive: true }));
+
+  // 光标跟踪：拖尾金星 + 点击涟漪
+  let mx = -1, my = -1, lx = -1, ly = -1;
+  const sparks = [], ripples = [];
+  addEventListener("mousemove", (e) => {
+    mx = e.clientX; my = e.clientY;
+    if (lx < 0) { lx = mx; ly = my; return; }
+    const dx = mx - lx, dy = my - ly;
+    if (dx * dx + dy * dy < 49) return;
+    lx = mx; ly = my;
+    for (let i = 0; i < 2; i++) {
+      if (sparks.length > 90) sparks.shift();
+      sparks.push({
+        x: mx + (Math.random() - 0.5) * 6, y: my + (Math.random() - 0.5) * 6,
+        vx: (Math.random() - 0.5) * 0.6, vy: 0.15 + Math.random() * 0.4,
+        r: 1.0 + Math.random() * 1.8, life: 1.1 + Math.random() * 0.4,
+      });
+    }
+  }, { passive: true });
+  addEventListener("pointerdown", (e) => {
+    if (ripples.length > 12) ripples.shift();
+    ripples.push({ x: e.clientX, y: e.clientY, r: 5, life: 1 });
+  }, { passive: true });
+
+  let last = performance.now();
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const dt = Math.min(50, now - last) / 16.7;
+    last = now;
+    if (document.hidden) return;
+
+    let target = 0;
+    if (analyser && audio && !audio.paused) {
+      if (analyser) analyser.getByteFrequencyData(freq);
+      let sum = 0;
+      for (let i = 0; i < 6; i++) sum += freq[i];
+      target = Math.min(1, (sum / 6 / 255) * 1.6);
+    }
+    level += (target - level) * 0.045;
+    document.body.style.setProperty("--pulse", level.toFixed(3));
+
+    /* 底层：柔光 + 尘埃（内容之下） */
+    ctx2d.clearRect(0, 0, W, H);
+    const glowR = (340 + level * 180) * DPR;
+    const g = ctx2d.createRadialGradient(W * 0.2, -H * 0.05, 0, W * 0.2, -H * 0.05, glowR);
+    g.addColorStop(0, "rgba(212,169,78," + (0.05 + level * 0.10).toFixed(3) + ")");
+    g.addColorStop(1, "rgba(212,169,78,0)");
+    ctx2d.fillStyle = g;
+    ctx2d.fillRect(0, 0, W, H);
+    for (const d of dust) {
+      d.y -= d.vy * (0.25 + level * 0.9) * dt;
+      d.x += Math.sin(now / 2400 + d.ph) * 0.00035 * dt;
+      if (d.y < -0.02) { d.y = 1.02; d.x = Math.random(); }
+      if (d.x < -0.02) d.x = 1.02; else if (d.x > 1.02) d.x = -0.02;
+      const tw = 0.75 + Math.sin(now / 1400 + d.ph) * 0.25;
+      ctx2d.beginPath();
+      ctx2d.arc(d.x * W, d.y * H, d.r * DPR, 0, Math.PI * 2);
+      ctx2d.fillStyle = d.gold
+        ? "rgba(212,169,78," + (d.a * tw * (0.7 + level * 0.8)).toFixed(3) + ")"
+        : "rgba(232,230,223," + (d.a * tw * (0.7 + level * 0.6)).toFixed(3) + ")";
+      ctx2d.fill();
+    }
+
+    /* 顶层：拖尾金星 + 点击涟漪（内容之上，每帧清屏，不留残影） */
+    ctxTop.clearRect(0, 0, W, H);
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const sp = sparks[i];
+      sp.life -= 0.022 * dt;
+      if (sp.life <= 0) { sparks.splice(i, 1); continue; }
+      sp.x += sp.vx * dt; sp.y += sp.vy * dt;
+      sp.vx *= 0.985; sp.vy *= 0.985;
+      sp.vy -= 0.008 * dt;
+      ctxTop.beginPath();
+      ctxTop.arc(sp.x * DPR, sp.y * DPR, sp.r * DPR, 0, Math.PI * 2);
+      ctxTop.fillStyle = "rgba(212,169,78," + (sp.life * 0.7).toFixed(3) + ")";
+      ctxTop.fill();
+    }
+    for (let i = ripples.length - 1; i >= 0; i--) {
+      const rp = ripples[i];
+      rp.life -= 0.02 * dt;
+      if (rp.life <= 0) { ripples.splice(i, 1); continue; }
+      rp.r += 3.8 * dt;
+      ctxTop.beginPath();
+      ctxTop.arc(rp.x * DPR, rp.y * DPR, rp.r * DPR, 0, Math.PI * 2);
+      ctxTop.strokeStyle = "rgba(212,169,78," + (rp.life * 0.55).toFixed(3) + ")";
+      ctxTop.lineWidth = 1.5 * DPR;
+      ctxTop.stroke();
+    }
+  }
+  requestAnimationFrame(frame);
+})();
+
+
+</script>
+</body>
+</html>

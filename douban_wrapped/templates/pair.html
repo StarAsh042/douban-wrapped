@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>双人契合度 · douban-wrapped</title>
+<style>
+  :root {
+    --bg: #0b0e11; --surface: #14181d; --surface-2: #1b2129;
+    --ink: #e8e6df; --sub: #8a949e; --gold: #d4a94e; --gold-dim: #a3823c;
+    --line: rgba(255,255,255,0.07);
+    --serif: "Noto Serif SC", "STZhongsong", "SimSun", serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--ink); min-height: 100vh;
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    padding: 56px 20px 80px; line-height: 1.7;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  .kicker { color: var(--sub); font-size: 12px; letter-spacing: 5px; margin-bottom: 12px; }
+  .kicker b { color: var(--gold); font-weight: 600; }
+  h1 { font-family: var(--serif); font-size: 34px; letter-spacing: 2px; margin-bottom: 8px; }
+  h1 .reel { color: var(--gold); }
+  .sub { color: var(--sub); font-size: 13px; margin-bottom: 30px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 14px; padding: 22px 26px; margin-bottom: 16px;
+  }
+  .card h2 { font-family: var(--serif); font-size: 18px; color: var(--gold); margin-bottom: 14px; font-weight: 600; }
+  .stats { display: flex; flex-wrap: wrap; gap: 12px 30px; }
+  .stat { min-width: 110px; }
+  .stat .v { font-family: var(--serif); font-size: 30px; color: var(--gold); }
+  .stat .k { color: var(--sub); font-size: 12px; margin-top: 2px; }
+  .desc { color: var(--ink); font-size: 14px; margin-bottom: 6px; }
+  .desc b { color: var(--gold); }
+  ul { list-style: none; }
+  li {
+    padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13.5px;
+    display: flex; justify-content: space-between; gap: 16px;
+  }
+  li:last-child { border-bottom: none; }
+  li .t { flex: 1; }
+  li .s { color: var(--sub); white-space: nowrap; font-size: 12.5px; }
+  li .s b { color: var(--gold); }
+  .agree b { color: var(--gold); }
+  .split b { color: #e08a8a; }
+  .empty { color: var(--sub); font-size: 13px; padding: 10px 0; }
+  .foot { color: var(--sub); font-size: 12px; text-align: center; margin-top: 30px; }
+  .foot a { color: var(--gold); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker">DOUBAN · <b>WRAPPED</b> · 双人契合度</div>
+  <h1>两个人的<span class="reel">观影默契</span></h1>
+  <p class="sub">把两份片单放在一起，看看口味有多合。</p>
+
+  <div class="card" id="card-summary">
+    <h2>契合度总览</h2>
+    <div class="stats" id="pair-stats"></div>
+    <p class="desc" id="pair-desc"></p>
+  </div>
+
+  <div class="card" id="card-agree">
+    <h2>双四星默契片</h2>
+    <ul id="pair-agree"></ul>
+  </div>
+
+  <div class="card" id="card-split">
+    <h2>极限分歧片</h2>
+    <ul id="pair-split"></ul>
+    <p class="empty" id="pair-split-desc"></p>
+  </div>
+
+  <div class="foot">由 <a href="/">douban-wrapped 控制台</a> 生成 · 数据仅存本机</div>
+</div>
+<script>
+const P = __PROFILE_JSON__;
+(function pairPage() {
+  const names = P.names || ["我", "TA"];
+  const n1 = names[0] || "我", n2 = names[1] || "TA";
+  const common = P.common || 0;
+  const rate = P.common_rate ?? "-";
+  const pearson = P.pearson;
+  const pairs = P.pairs || 0;
+  const total = P.total || [];
+
+  const stats = document.getElementById("pair-stats");
+  const items = [
+    [common, "共同看过（部）"],
+    [rate + "%", "片单重合率"],
+    [pearson == null ? "-" : pearson, "评分相关性"],
+    [pairs, "双评分样本（部）"],
+  ];
+  stats.innerHTML = items.map(x => '<div class="stat"><div class="v">' + x[0] + '</div><div class="k">' + x[1] + '</div></div>').join("");
+
+  let word = "";
+  if (pearson != null) {
+    word = pearson > 0.7 ? "高度同步" : (pearson > 0.4 ? "口味相近" : (pearson > 0.1 ? "各有偏好" : "南辕北辙"));
+  }
+  const desc = document.getElementById("pair-desc");
+  if (!common) {
+    desc.textContent = "两份片单没有交集——各看各的宇宙。";
+  } else {
+    desc.innerHTML = n1 + "看过 <b>" + (total[0] ?? "-") + "</b> 部，" + n2 + "看过 <b>" + (total[1] ?? "-") +
+      "</b> 部；共同看过 <b>" + common + "</b> 部（占较小片单的 " + rate + "%）" +
+      (pearson != null ? "，评分相关性 <b>" + pearson + "</b>（" + word + "，样本 " + pairs + " 部）" : "") + "。";
+  }
+
+  const agree = P.agree || [];
+  const agreeUl = document.getElementById("pair-agree");
+  agreeUl.innerHTML = agree.length
+    ? agree.map(f => '<li class="agree"><span class="t">' + f.title + (f.year ? ' <span class="s">' + f.year + '</span>' : '') +
+        '</span><span class="s"><b>' + n1 + ' ' + (f[n1] ?? "-") + '★</b> · ' + n2 + ' ' + (f[n2] ?? "-") + '★</span></li>').join("")
+    : '<li class="empty">还没有双双四星的电影，一起补几部吧。</li>';
+
+  const split = P.split || [];
+  const splitUl = document.getElementById("pair-split");
+  splitUl.innerHTML = split.length
+    ? split.map(f => '<li class="split"><span class="t">' + f.title + (f.year ? ' <span class="s">' + f.year + '</span>' : '') +
+        '</span><span class="s"><b>' + n1 + ' ' + (f[n1] ?? "-") + '★</b> · ' + n2 + ' ' + (f[n2] ?? "-") + '★</span></li>').join("")
+    : '<li class="empty">没有极限分歧——口味相当一致。</li>';
+  document.getElementById("pair-split-desc").textContent = (P.only1_count ?? 0)
+    ? "另有 " + P.only1_count + " 部只有 " + n1 + " 看过，等待对方发现。" : "";
+})();
+</script>
+</body>
+</html>
