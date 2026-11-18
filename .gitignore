@@ -10,3 +10,6 @@ __pycache__/
 *.pyc
 .venv/
 .env
+
+# local tool caches
+.dsh-ops/
